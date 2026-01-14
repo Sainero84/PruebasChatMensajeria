@@ -99,8 +99,9 @@ public class AppCliente {
 					respuesta = clienteLogic.register(user, pass);
 				}
 
-				if (respuesta != null && (respuesta.contains("CORRECTO") || respuesta.contains("REGISTRADO"))) {
-					JOptionPane.showMessageDialog(this, "Acceso concedido");
+				if (respuesta != null
+						&& (respuesta.equals("LOGIN_CORRECTO") || respuesta.equals("REGISTRADO CORRECTAMENTE"))) {
+					JOptionPane.showMessageDialog(this, "Aceso concedido");
 					// Abrir menú principal
 					FrameMenu menu = new FrameMenu();
 					menu.setVisible(true);
