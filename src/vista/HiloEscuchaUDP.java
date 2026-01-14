@@ -74,24 +74,25 @@ public class HiloEscuchaUDP extends Thread {
 					PublicKey clavePublicaRemota = generadorClavesRSA.generatePublic(especificaciones);
 					cliente.setClavePublicaRemota(clavePublicaRemota);
 
+					KeyGenerator kg = KeyGenerator.getInstance("AES");
+					SecretKey aes;
+
 					if (cliente.getClaveAES() == null) {
-
-						KeyGenerator kg = KeyGenerator.getInstance("AES");
 						kg.init(128);
-						SecretKey aes = kg.generateKey();
+						aes = kg.generateKey();
 						cliente.setClaveAES(aes);
-						this.key = aes;
-
-						Cipher rsa = Cipher.getInstance("RSA");
-						rsa.init(Cipher.ENCRYPT_MODE, clavePublicaRemota);
-						byte[] aesCifrada = rsa.doFinal(cliente.getClaveAES().getEncoded());
-
-						String aesBase64 = Base64.getEncoder().encodeToString(aesCifrada);
-						String msgAES = "CHAT_KEY " + cliente.getNombre() + " " + aesBase64;
-
-						byte[] buf = msgAES.getBytes(StandardCharsets.UTF_8);
-						socket.send(new DatagramPacket(buf, buf.length, paqueteUDP.getAddress(), paqueteUDP.getPort()));
+					} else {
+						aes = cliente.getClaveAES();
 					}
+
+					Cipher rsa = Cipher.getInstance("RSA");
+					rsa.init(Cipher.ENCRYPT_MODE, clavePublicaRemota);
+					byte[] aesCifrada = rsa.doFinal(cliente.getClaveAES().getEncoded());
+
+					String aesBase64 = Base64.getEncoder().encodeToString(aesCifrada);
+					String msgAES = "CHAT_KEY " + cliente.getNombre() + " " + aesBase64;
+					byte[] buf = msgAES.getBytes(StandardCharsets.UTF_8);
+					socket.send(new DatagramPacket(buf, buf.length, paqueteUDP.getAddress(), paqueteUDP.getPort()));
 
 					mostrarMensaje(">> Sistema: Clave pública recibida. Conexión segura iniciando...");
 					continue;

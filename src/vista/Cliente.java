@@ -173,7 +173,7 @@ public class Cliente {
 			// Nota: En un P2P real, el que recibe la Public Key suele generar la AES,
 			// pero mantendremos la lógica aproximada a tu código original.
 
-			while (claveAES == null) {
+			while (clavePublicaRemota == null || claveAES == null) {
 				Thread.sleep(500);
 			}
 
@@ -186,14 +186,16 @@ public class Cliente {
 
 	public void enviarMensajeChat(String mensaje, String receptor, String ipDestino, int puertoDestino) {
 		try {
-			if (claveAES == null)
+			if (claveAES == null) {
 				return;
+			}
 
 			Cipher aesCipher = Cipher.getInstance("AES");
 			aesCipher.init(Cipher.ENCRYPT_MODE, claveAES);
 			byte[] cifrado = aesCipher.doFinal(mensaje.getBytes(StandardCharsets.UTF_8));
 			String msgCifrado = Base64.getEncoder().encodeToString(cifrado);
 
+			signature.initSign(clavePrivada);
 			signature.update(mensaje.getBytes());
 			String firma = Base64.getEncoder().encodeToString(signature.sign());
 			String hash = mensajeIntegridad(mensaje);
