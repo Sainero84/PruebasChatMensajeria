@@ -186,8 +186,8 @@ public class Cliente {
 
 	public void enviarMensajeChat(String mensaje, String receptor, String ipDestino, int puertoDestino) {
 		try {
-			if (claveAES == null) {
-				return;
+			while (claveAES == null) {
+				Thread.sleep(100); // Espera hasta que la clave AES esté disponible
 			}
 
 			Cipher aesCipher = Cipher.getInstance("AES");

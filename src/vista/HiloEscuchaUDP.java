@@ -111,9 +111,8 @@ public class HiloEscuchaUDP extends Thread {
 				}
 
 				if (mensaje.startsWith("CHAT_MSG")) {
-					if (key == null) {
-						mostrarMensaje(">> Error: Mensaje recibido sin clave de sesión establecida.");
-						continue;
+					while (key == null) {
+						Thread.sleep(50);
 					}
 
 					Cipher aesCipher = Cipher.getInstance("AES");
