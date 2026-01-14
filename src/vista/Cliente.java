@@ -153,7 +153,7 @@ public class Cliente {
 	}
 
 	// Método para generar claves y enviar la handshake inicial
-	public void establecerClavesChat(String ipDestino, int puertoDestino) {
+	public void establecerClavesChat(String ipDestino, int puertoDestino, String usuarioDestino) {
 		try {
 			KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
 			kpg.initialize(2048);
@@ -176,7 +176,8 @@ public class Cliente {
 			// Esperar un poco a que el otro lado procese (idealmente sería handshake
 			// asíncrono)
 			Thread.sleep(1000);
-
+			if (this.nombre.compareTo(usuarioDestino)<0) {
+				
 			KeyGenerator kg = KeyGenerator.getInstance("AES");
 			kg.init(128);
 			claveAES = kg.generateKey();
@@ -203,6 +204,7 @@ public class Cliente {
 				socketUDP.send(new DatagramPacket(bAES, bAES.length, InetAddress.getByName(ipDestino), puertoDestino));
 			}
 
+		}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

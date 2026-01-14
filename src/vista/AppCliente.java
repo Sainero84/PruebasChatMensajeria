@@ -237,7 +237,7 @@ public class AppCliente {
 
 			new Thread(() -> {
 				textArea.append(">> Estableciendo conexión segura...\n");
-				clienteLogic.establecerClavesChat(ipDestino, puertoDestino);
+				clienteLogic.establecerClavesChat(ipDestino, puertoDestino, usuarioDestino);
 			}).start();
 
 			ActionListener enviarAction = e -> {

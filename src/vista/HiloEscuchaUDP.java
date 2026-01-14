@@ -33,8 +33,6 @@ public class HiloEscuchaUDP extends Thread {
 
 	// En HiloEscuchaUDP.java
 
-	// ... resto de atributos ...
-
 	// Añade este método
 	public void setClaveAES(SecretKey key) {
 		this.key = key;
@@ -91,9 +89,7 @@ public class HiloEscuchaUDP extends Thread {
 				}
 
 				if (mensaje.startsWith("CHAT_MSG")) {
-					if (key == null)
-						key = cliente.getClaveAES(); // Intentar recuperar del cliente si es null
-
+					this.key = cliente.getClaveAES();
 					if (key == null) {
 						mostrarMensaje(">> Error: Mensaje recibido sin clave de sesión establecida.");
 						continue;
