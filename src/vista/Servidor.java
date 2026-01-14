@@ -43,7 +43,8 @@ public class Servidor {
 		}
 	}
 
-	// Creamos el método para registrar un cliente añadiéndolo al hashmap
+	// Creamos el método para registrar un cliente añadiéndolo al fichero .txt de
+	// usuarios
 	public synchronized boolean registrarUsuario(String nombre, String ip, int puerto, String password) {
 		if (infoClientes.containsKey(nombre)) {
 			return false;
@@ -176,6 +177,7 @@ public class Servidor {
 		return false;
 	}
 
+	// Getter de la clase Cliente Info
 	public synchronized ClienteInfo getCliente(String nombre) {
 		return infoClientes.get(nombre);
 	}

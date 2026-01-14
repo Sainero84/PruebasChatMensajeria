@@ -176,35 +176,26 @@ public class Cliente {
 			// Esperar un poco a que el otro lado procese (idealmente sería handshake
 			// asíncrono)
 			Thread.sleep(1000);
-			if (this.nombre.compareTo(usuarioDestino)<0) {
-				
+
 			KeyGenerator kg = KeyGenerator.getInstance("AES");
 			kg.init(128);
 			claveAES = kg.generateKey();
 
-			if (hiloUDP != null) {
-				hiloUDP.setClaveAES(claveAES);
+			hiloUDP.setClaveAES(claveAES);
+
+			while (clavePublicaRemota == null) {
+				Thread.sleep(1000);
 			}
 
-			// Esperar a tener la clave remota (seteada por el HiloEscucha)
-			int intentos = 0;
-			while (clavePublicaRemota == null && intentos < 10) {
-				Thread.sleep(500);
-				intentos++;
-			}
+			Cipher rsa = Cipher.getInstance("RSA");
+			rsa.init(Cipher.ENCRYPT_MODE, clavePublicaRemota);
+			byte[] aesCifrada = rsa.doFinal(claveAES.getEncoded());
+			String aesBase64 = Base64.getEncoder().encodeToString(aesCifrada);
 
-			if (clavePublicaRemota != null) {
-				Cipher rsa = Cipher.getInstance("RSA");
-				rsa.init(Cipher.ENCRYPT_MODE, clavePublicaRemota);
-				byte[] aesCifrada = rsa.doFinal(claveAES.getEncoded());
-				String aesBase64 = Base64.getEncoder().encodeToString(aesCifrada);
+			String msgAES = "CHAT_KEY " + nombre + " " + aesBase64;
+			byte[] bAES = msgAES.getBytes();
+			socketUDP.send(new DatagramPacket(bAES, bAES.length, InetAddress.getByName(ipDestino), puertoDestino));
 
-				String msgAES = "CHAT_KEY " + nombre + " " + aesBase64;
-				byte[] bAES = msgAES.getBytes();
-				socketUDP.send(new DatagramPacket(bAES, bAES.length, InetAddress.getByName(ipDestino), puertoDestino));
-			}
-
-		}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

@@ -89,20 +89,20 @@ public class HiloEscuchaUDP extends Thread {
 				}
 
 				if (mensaje.startsWith("CHAT_MSG")) {
-					this.key = cliente.getClaveAES();
 					if (key == null) {
 						mostrarMensaje(">> Error: Mensaje recibido sin clave de sesión establecida.");
 						continue;
 					}
 
+					Cipher aesCipher = Cipher.getInstance("AES");
+				    aesCipher.init(Cipher.DECRYPT_MODE, key);
+					
 					String[] partes = mensaje.split(" ", 5);
 					String emisor = partes[1];
 					String mensajeCifrado = partes[2];
 					String hashIntegridad = partes[3];
 					String firmaRecibida = partes[4];
 
-					Cipher aesCipher = Cipher.getInstance("AES");
-					aesCipher.init(Cipher.DECRYPT_MODE, key);
 					byte[] descifrado = aesCipher.doFinal(Base64.getDecoder().decode(mensajeCifrado));
 					String mensajePlano = new String(descifrado, StandardCharsets.UTF_8);
 
@@ -116,7 +116,7 @@ public class HiloEscuchaUDP extends Thread {
 							if (signature.verify(firmaCliente)) {
 								String hashCalculado = mensajeIntegridad(mensajePlano);
 								if (!hashIntegridad.equals(hashCalculado)) {
-									mostrarMensaje(">> ALERTA: Mensaje alterado.");
+									mostrarMensaje("ALERTA: Mensaje alterado.");
 								}
 								mostrarMensaje(emisor + ": " + mensajePlano);
 								cliente.getGestorHistorial().guardarMensaje(emisor, cliente.getNombre(), mensajePlano);
@@ -130,6 +130,7 @@ public class HiloEscuchaUDP extends Thread {
 				}
 			}
 		} catch (SocketException e) {
+			e.printStackTrace();
 			// Socket cerrado intencionalmente
 		} catch (Exception e) {
 			e.printStackTrace();
