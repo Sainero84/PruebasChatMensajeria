@@ -173,22 +173,11 @@ public class Cliente {
 			// Nota: En un P2P real, el que recibe la Public Key suele generar la AES,
 			// pero mantendremos la lógica aproximada a tu código original.
 
-			// Esperar un poco a que el otro lado procese (idealmente sería handshake
-			// asíncrono)
-			Thread.sleep(100);
-
-			while (clavePublicaRemota == null) {
-				Thread.sleep(1000);
+			while (clavePublicaRemota == null || claveAES == null) {
+				Thread.sleep(500);
 			}
 
-			Cipher rsa = Cipher.getInstance("RSA");
-			rsa.init(Cipher.ENCRYPT_MODE, clavePublicaRemota);
-			byte[] aesCifrada = rsa.doFinal(claveAES.getEncoded());
-			String aesBase64 = Base64.getEncoder().encodeToString(aesCifrada);
-
-			String msgAES = "CHAT_KEY " + nombre + " " + aesBase64;
-			byte[] bAES = msgAES.getBytes();
-			socketUDP.send(new DatagramPacket(bAES, bAES.length, InetAddress.getByName(ipDestino), puertoDestino));
+			System.out.println(">> Sistema: Conexión segura establecida con " + usuarioDestino);
 
 		} catch (Exception e) {
 			e.printStackTrace();
