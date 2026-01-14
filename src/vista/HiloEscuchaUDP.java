@@ -11,6 +11,7 @@ import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import javax.swing.JTextArea; // Importante para la GUI
@@ -72,6 +73,24 @@ public class HiloEscuchaUDP extends Thread {
 					KeyFactory generadorClavesRSA = KeyFactory.getInstance("RSA");
 					PublicKey clavePublicaRemota = generadorClavesRSA.generatePublic(especificaciones);
 					cliente.setClavePublicaRemota(clavePublicaRemota);
+
+					KeyGenerator kg = KeyGenerator.getInstance("AES");
+					kg.init(128);
+					SecretKey aes = kg.generateKey();
+
+					cliente.setClaveAES(aes);
+					this.key = aes;
+
+					Cipher rsa = Cipher.getInstance("RSA");
+					rsa.init(Cipher.ENCRYPT_MODE, clavePublicaRemota);
+					byte[] aesCifrada = rsa.doFinal(aes.getEncoded());
+
+					String aesBase64 = Base64.getEncoder().encodeToString(aesCifrada);
+					String msgAES = "CHAT_KEY " + cliente.getNombre() + " " + aesBase64;
+
+					byte[] buf = msgAES.getBytes(StandardCharsets.UTF_8);
+					socket.send(new DatagramPacket(buf, buf.length, paqueteUDP.getAddress(), paqueteUDP.getPort()));
+
 					mostrarMensaje(">> Sistema: Clave pública recibida. Conexión segura iniciando...");
 					continue;
 				}
@@ -95,8 +114,8 @@ public class HiloEscuchaUDP extends Thread {
 					}
 
 					Cipher aesCipher = Cipher.getInstance("AES");
-				    aesCipher.init(Cipher.DECRYPT_MODE, key);
-					
+					aesCipher.init(Cipher.DECRYPT_MODE, key);
+
 					String[] partes = mensaje.split(" ", 5);
 					String emisor = partes[1];
 					String mensajeCifrado = partes[2];

@@ -175,13 +175,7 @@ public class Cliente {
 
 			// Esperar un poco a que el otro lado procese (idealmente sería handshake
 			// asíncrono)
-			Thread.sleep(1000);
-
-			KeyGenerator kg = KeyGenerator.getInstance("AES");
-			kg.init(128);
-			claveAES = kg.generateKey();
-
-			hiloUDP.setClaveAES(claveAES);
+			Thread.sleep(100);
 
 			while (clavePublicaRemota == null) {
 				Thread.sleep(1000);
