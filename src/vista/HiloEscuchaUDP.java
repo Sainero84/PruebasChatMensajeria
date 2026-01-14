@@ -2,41 +2,53 @@ package vista;
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
+import java.security.MessageDigest;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
-import java.util.LinkedList;
-import java.util.Queue;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-import javax.swing.JTextArea;
+import javax.swing.JTextArea; // Importante para la GUI
 
 public class HiloEscuchaUDP extends Thread {
 	private DatagramSocket socket;
 	private SecretKey key;
 	private Cliente cliente;
-	private JTextArea areaChat;
-	private Queue<String> mensajesPendientes = new LinkedList<>();
-	private boolean handshakeCompletado = false; // Para saber si AES está lista
+	private JTextArea areaChat; // Referencia a la pantalla de chat
 
 	public HiloEscuchaUDP(DatagramSocket socket, Cliente c) {
 		this.socket = socket;
 		this.cliente = c;
 	}
 
+	// Método para vincular la ventana de chat actual
 	public void setAreaChat(JTextArea areaChat) {
 		this.areaChat = areaChat;
 	}
 
+	// En HiloEscuchaUDP.java
+
+	// Añade este método
+	public void setClaveAES(SecretKey key) {
+		this.key = key;
+		System.out.println("Clave AES actualizada manualmente en el hilo de escucha.");
+	}
+
+	// Asegúrate de que en el método run(), cuando desencriptas, usas esta 'key'
+	// ...
+
+	// Método helper para imprimir tanto en consola como en GUI si existe
 	private void mostrarMensaje(String texto) {
 		System.out.println(texto);
 		if (areaChat != null) {
 			areaChat.append(texto + "\n");
+			// Auto-scroll hacia abajo
 			areaChat.setCaretPosition(areaChat.getDocument().getLength());
 		}
 	}
@@ -44,133 +56,121 @@ public class HiloEscuchaUDP extends Thread {
 	@Override
 	public void run() {
 		try {
-			byte[] buffer = new byte[4096];
-			System.out.println("Escuchando UDP en el puerto " + socket.getLocalPort());
+			byte[] buffer = new byte[4096]; // Aumentado un poco por si las claves son largas
+			System.out.println("Escuchando peticiones UDP en el puerto " + socket.getLocalPort());
 
 			while (!socket.isClosed()) {
-				DatagramPacket paquete = new DatagramPacket(buffer, buffer.length);
-				socket.receive(paquete);
-				String mensaje = new String(paquete.getData(), 0, paquete.getLength(), StandardCharsets.UTF_8);
+				DatagramPacket paqueteUDP = new DatagramPacket(buffer, buffer.length);
+				socket.receive(paqueteUDP);
+
+				String mensaje = new String(paqueteUDP.getData(), 0, paqueteUDP.getLength(), StandardCharsets.UTF_8);
 
 				if (mensaje.startsWith("CHAT_PUBLICKEY")) {
-					recibirPublicKey(mensaje, paquete);
+					String[] partes = mensaje.split(" ", 4);
+					String keyBase64 = partes[2];
+					byte[] keyBytes = Base64.getDecoder().decode(keyBase64);
+					X509EncodedKeySpec especificaciones = new X509EncodedKeySpec(keyBytes);
+					KeyFactory generadorClavesRSA = KeyFactory.getInstance("RSA");
+					PublicKey clavePublicaRemota = generadorClavesRSA.generatePublic(especificaciones);
+					cliente.setClavePublicaRemota(clavePublicaRemota);
+
+					KeyGenerator kg = KeyGenerator.getInstance("AES");
+					kg.init(128);
+					SecretKey aes = kg.generateKey();
+
+					cliente.setClaveAES(aes);
+					this.key = aes;
+
+					Cipher rsa = Cipher.getInstance("RSA");
+					rsa.init(Cipher.ENCRYPT_MODE, clavePublicaRemota);
+					byte[] aesCifrada = rsa.doFinal(aes.getEncoded());
+
+					String aesBase64 = Base64.getEncoder().encodeToString(aesCifrada);
+					String msgAES = "CHAT_KEY " + cliente.getNombre() + " " + aesBase64;
+
+					byte[] buf = msgAES.getBytes(StandardCharsets.UTF_8);
+					socket.send(new DatagramPacket(buf, buf.length, paqueteUDP.getAddress(), paqueteUDP.getPort()));
+
+					mostrarMensaje(">> Sistema: Clave pública recibida. Conexión segura iniciando...");
 					continue;
 				}
 
 				if (mensaje.startsWith("CHAT_KEY")) {
-					recibirChatKey(mensaje);
+					String[] partes = mensaje.split(" ", 3);
+					String claveAESBase64 = partes[2];
+					Cipher cifradoRSA = Cipher.getInstance("RSA");
+					cifradoRSA.init(Cipher.DECRYPT_MODE, cliente.getClavePrivada());
+					byte[] bytesAES = cifradoRSA.doFinal(Base64.getDecoder().decode(claveAESBase64));
+					key = new SecretKeySpec(bytesAES, "AES");
+					cliente.setClaveAES(key); // Guardamos la clave en el cliente también
+					mostrarMensaje(">> Sistema: Clave AES establecida. Chat seguro activo.");
 					continue;
 				}
 
-				// Mensaje normal
 				if (mensaje.startsWith("CHAT_MSG")) {
-					if (!handshakeCompletado) {
-						// Guardamos hasta que handshake se complete
-						mensajesPendientes.add(mensaje);
+					if (key == null) {
+						mostrarMensaje(">> Error: Mensaje recibido sin clave de sesión establecida.");
 						continue;
 					}
-					procesarCHAT_MSG(mensaje);
+
+					Cipher aesCipher = Cipher.getInstance("AES");
+					aesCipher.init(Cipher.DECRYPT_MODE, key);
+
+					String[] partes = mensaje.split(" ", 5);
+					String emisor = partes[1];
+					String mensajeCifrado = partes[2];
+					String hashIntegridad = partes[3];
+					String firmaRecibida = partes[4];
+
+					byte[] descifrado = aesCipher.doFinal(Base64.getDecoder().decode(mensajeCifrado));
+					String mensajePlano = new String(descifrado, StandardCharsets.UTF_8);
+
+					try {
+						Signature signature = Signature.getInstance("SHA256withRSA");
+						if (cliente.getClavePublicaRemota() != null) {
+							signature.initVerify(cliente.getClavePublicaRemota());
+							signature.update(mensajePlano.getBytes());
+							byte[] firmaCliente = Base64.getDecoder().decode(firmaRecibida);
+
+							if (signature.verify(firmaCliente)) {
+								String hashCalculado = mensajeIntegridad(mensajePlano);
+								if (!hashIntegridad.equals(hashCalculado)) {
+									mostrarMensaje("ALERTA: Mensaje alterado.");
+								}
+								mostrarMensaje(emisor + ": " + mensajePlano);
+								cliente.getGestorHistorial().guardarMensaje(emisor, cliente.getNombre(), mensajePlano);
+							} else {
+								mostrarMensaje(">> ALERTA: Firma inválida de " + emisor);
+							}
+						}
+					} catch (Exception e) {
+						mostrarMensaje(">> Error verificando firma: " + e.getMessage());
+					}
 				}
 			}
+		} catch (SocketException e) {
+			e.printStackTrace();
+			// Socket cerrado intencionalmente
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
 
-	private void recibirPublicKey(String mensaje, DatagramPacket paquete) throws Exception {
-		String[] partes = mensaje.split(" ", 4);
-		String keyBase64 = partes[2];
-		byte[] keyBytes = Base64.getDecoder().decode(keyBase64);
-		X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes);
-		KeyFactory kf = KeyFactory.getInstance("RSA");
-		PublicKey clavePublicaRemota = kf.generatePublic(spec);
-		cliente.setClavePublicaRemota(clavePublicaRemota);
-
-		// Generar AES si no existe
-		if (cliente.getClaveAES() == null) {
-			KeyGenerator kg = KeyGenerator.getInstance("AES");
-			kg.init(128);
-			SecretKey aes = kg.generateKey();
-			cliente.setClaveAES(aes);
-			this.key = aes;
-		}
-
-		// Enviar AES cifrada
-		Cipher rsa = Cipher.getInstance("RSA");
-		rsa.init(Cipher.ENCRYPT_MODE, clavePublicaRemota);
-		byte[] aesCifrada = rsa.doFinal(cliente.getClaveAES().getEncoded());
-		String aesBase64 = Base64.getEncoder().encodeToString(aesCifrada);
-		String msgAES = "CHAT_KEY " + cliente.getNombre() + " " + aesBase64;
-		socket.send(new DatagramPacket(msgAES.getBytes(StandardCharsets.UTF_8), msgAES.length(), paquete.getAddress(),
-				paquete.getPort()));
-
-		mostrarMensaje(">> Sistema: Clave pública recibida. Esperando confirmación AES...");
-	}
-
-	private void recibirChatKey(String mensaje) throws Exception {
-		String[] partes = mensaje.split(" ", 3);
-		String claveAESBase64 = partes[2];
-		Cipher cifradoRSA = Cipher.getInstance("RSA");
-		cifradoRSA.init(Cipher.DECRYPT_MODE, cliente.getClavePrivada());
-		byte[] bytesAES = cifradoRSA.doFinal(Base64.getDecoder().decode(claveAESBase64));
-		key = new SecretKeySpec(bytesAES, "AES");
-		cliente.setClaveAES(key);
-		handshakeCompletado = true;
-
-		mostrarMensaje(">> Sistema: Chat seguro activo.");
-
-		// Procesar mensajes pendientes
-		while (!mensajesPendientes.isEmpty()) {
-			procesarCHAT_MSG(mensajesPendientes.poll());
-		}
-	}
-
-	private void procesarCHAT_MSG(String mensaje) {
+	private String mensajeIntegridad(String texto) {
 		try {
-			Cipher aesCipher = Cipher.getInstance("AES");
-			aesCipher.init(Cipher.DECRYPT_MODE, key);
-
-			String[] partes = mensaje.split(" ", 5);
-			String emisor = partes[1];
-			String mensajeCifrado = partes[2];
-			String hashIntegridad = partes[3];
-			String firmaRecibida = partes[4];
-
-			byte[] descifrado = aesCipher.doFinal(Base64.getDecoder().decode(mensajeCifrado));
-			String mensajePlano = new String(descifrado, StandardCharsets.UTF_8);
-
-			Signature signature = Signature.getInstance("SHA256withRSA");
-			if (cliente.getClavePublicaRemota() != null) {
-				signature.initVerify(cliente.getClavePublicaRemota());
-				signature.update(mensajePlano.getBytes());
-				byte[] firmaCliente = Base64.getDecoder().decode(firmaRecibida);
-
-				if (signature.verify(firmaCliente)) {
-					String hashCalculado = mensajeIntegridad(mensajePlano);
-					if (!hashIntegridad.equals(hashCalculado)) {
-						mostrarMensaje("ALERTA: Mensaje alterado.");
-					}
-					mostrarMensaje(emisor + ": " + mensajePlano);
-					cliente.getGestorHistorial().guardarMensaje(emisor, cliente.getNombre(), mensajePlano);
-				} else {
-					mostrarMensaje(">> ALERTA: Firma inválida de " + emisor);
-				}
+			MessageDigest md = MessageDigest.getInstance("SHA-256");
+			byte[] bytes = texto.getBytes(StandardCharsets.UTF_8);
+			byte[] hash = md.digest(bytes);
+			StringBuilder sb = new StringBuilder();
+			for (byte b : hash) {
+				String cifradoHex = Integer.toHexString(0xff & b);
+				if (cifradoHex.length() == 1)
+					sb.append("0");
+				sb.append(cifradoHex);
 			}
+			return sb.toString();
 		} catch (Exception e) {
-			mostrarMensaje(">> Error procesando mensaje: " + e.getMessage());
+			throw new RuntimeException("Error al calcular hash");
 		}
-	}
-
-	private String mensajeIntegridad(String texto) throws Exception {
-		java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
-		byte[] hash = md.digest(texto.getBytes(StandardCharsets.UTF_8));
-		StringBuilder sb = new StringBuilder();
-		for (byte b : hash) {
-			String hex = Integer.toHexString(0xff & b);
-			if (hex.length() == 1)
-				sb.append("0");
-			sb.append(hex);
-		}
-		return sb.toString();
 	}
 }
