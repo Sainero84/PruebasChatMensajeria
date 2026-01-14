@@ -67,7 +67,6 @@ public class HiloEscuchaUDP extends Thread {
 
 				if (mensaje.startsWith("CHAT_PUBLICKEY")) {
 					String[] partes = mensaje.split(" ", 4);
-					String emisor = partes[1];
 					String keyBase64 = partes[2];
 					byte[] keyBytes = Base64.getDecoder().decode(keyBase64);
 					X509EncodedKeySpec especificaciones = new X509EncodedKeySpec(keyBytes);
@@ -75,25 +74,24 @@ public class HiloEscuchaUDP extends Thread {
 					PublicKey clavePublicaRemota = generadorClavesRSA.generatePublic(especificaciones);
 					cliente.setClavePublicaRemota(clavePublicaRemota);
 
-					if (this.key==null) {
-						
-					KeyGenerator kg = KeyGenerator.getInstance("AES");
-					kg.init(128);
-					SecretKey aes = kg.generateKey();
+					if (cliente.getClaveAES() == null) {
 
-					cliente.setClaveAES(aes);
-					this.key = aes;
-				}
+						KeyGenerator kg = KeyGenerator.getInstance("AES");
+						kg.init(128);
+						SecretKey aes = kg.generateKey();
+						cliente.setClaveAES(aes);
+						this.key = aes;
 
-					Cipher rsa = Cipher.getInstance("RSA");
-					rsa.init(Cipher.ENCRYPT_MODE, clavePublicaRemota);
-					byte[] aesCifrada = rsa.doFinal(cliente.getClaveAES().getEncoded());
+						Cipher rsa = Cipher.getInstance("RSA");
+						rsa.init(Cipher.ENCRYPT_MODE, clavePublicaRemota);
+						byte[] aesCifrada = rsa.doFinal(cliente.getClaveAES().getEncoded());
 
-					String aesBase64 = Base64.getEncoder().encodeToString(aesCifrada);
-					String msgAES = "CHAT_KEY " + cliente.getNombre() + " " + aesBase64;
+						String aesBase64 = Base64.getEncoder().encodeToString(aesCifrada);
+						String msgAES = "CHAT_KEY " + cliente.getNombre() + " " + aesBase64;
 
-					byte[] buf = msgAES.getBytes(StandardCharsets.UTF_8);
-					socket.send(new DatagramPacket(buf, buf.length, paqueteUDP.getAddress(), paqueteUDP.getPort()));
+						byte[] buf = msgAES.getBytes(StandardCharsets.UTF_8);
+						socket.send(new DatagramPacket(buf, buf.length, paqueteUDP.getAddress(), paqueteUDP.getPort()));
+					}
 
 					mostrarMensaje(">> Sistema: Clave pública recibida. Conexión segura iniciando...");
 					continue;

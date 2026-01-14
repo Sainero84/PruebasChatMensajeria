@@ -173,7 +173,7 @@ public class Cliente {
 			// Nota: En un P2P real, el que recibe la Public Key suele generar la AES,
 			// pero mantendremos la lógica aproximada a tu código original.
 
-			while (clavePublicaRemota == null || claveAES == null) {
+			while (claveAES == null) {
 				Thread.sleep(500);
 			}
 
