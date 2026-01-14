@@ -20,8 +20,8 @@ public class GestorHistorial {
 	}
 
 	private void inicializarBD() {
-		String sql = "CREATE TABLE IF NOT EXISTS mensajes (" + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-				+ "emisor TEXT NOT NULL," + "receptor TEXT NOT NULL," + "mensaje TEXT NOT NULL)";
+		String sql = "Create table if NOT EXISTS mensajes (" + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+				+ "emisor TEXT not null," + "receptor TEXT not null," + "mensaje TEXT not null)";
 
 		try (Connection conn = conectar(); Statement stmt = conn.createStatement()) {
 			if (conn != null)
@@ -31,9 +31,8 @@ public class GestorHistorial {
 		}
 	}
 
-	// Guardar es mucho más intuitivo ahora
 	public void guardarMensaje(String emisor, String receptor, String mensaje) {
-		String sql = "INSERT INTO mensajes(emisor, receptor, mensaje) VALUES(?,?,?)";
+		String sql = "insert into mensajes(emisor, receptor, mensaje) values(?,?,?)";
 
 		try (Connection conn = conectar(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
@@ -47,15 +46,11 @@ public class GestorHistorial {
 		}
 	}
 
-	// AQUÍ ESTÁ EL CAMBIO IMPORTANTE
-	// Necesitamos saber quién soy 'yo' y quién es el 'otro'
 	public String recuperarChat(String miUsuario, String otroUsuario) {
 		StringBuilder historial = new StringBuilder();
 
-		// La lógica: Mensajes donde (Emisor es Pepe Y Receptor soy Yo) O (Emisor soy Yo
-		// Y Receptor es Pepe)
-		String sql = "SELECT emisor, mensaje FROM mensajes " + "WHERE (emisor = ? AND receptor = ?) "
-				+ "OR (emisor = ? AND receptor = ?) " + "ORDER BY id ASC";
+		String sql = "Select DISTINCT emisor, mensaje from mensajes " + "where (emisor = ? AND receptor = ?) "
+				+ "or (emisor = ? AND receptor = ?) " + "order by id ASC";
 
 		try (Connection conn = conectar(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
 

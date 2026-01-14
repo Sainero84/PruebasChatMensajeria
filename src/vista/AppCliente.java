@@ -23,7 +23,6 @@ public class AppCliente {
 
 	private Cliente clienteLogic;
 
-	// --- PANTALLA LOGIN / REGISTRO ---
 	public class FrameLogin extends JFrame {
 		private JTextField txtUser;
 		private JPasswordField txtPass;
@@ -36,7 +35,7 @@ public class AppCliente {
 			JPanel contentPane = new JPanel();
 			contentPane.setBorder(new EmptyBorder(10, 10, 10, 10));
 			setContentPane(contentPane);
-			contentPane.setLayout(null); // Layout nulo estilo WindowBuilder básico
+			contentPane.setLayout(null);
 
 			JLabel lblIp = new JLabel("IP Servidor:");
 			lblIp.setBounds(30, 30, 80, 14);
@@ -70,12 +69,10 @@ public class AppCliente {
 			btnRegister.setBounds(180, 160, 120, 30);
 			contentPane.add(btnRegister);
 
-			// Acción Login
 			btnLogin.addActionListener(e -> {
 				conectarYAccionar("LOGIN");
 			});
 
-			// Acción Registro
 			btnRegister.addActionListener(e -> {
 				conectarYAccionar("REGISTER");
 			});
@@ -87,9 +84,8 @@ public class AppCliente {
 			String pass = new String(txtPass.getPassword());
 
 			try {
-				// Si no hay cliente o se cerró, crear uno nuevo
 				if (clienteLogic == null) {
-					clienteLogic = new Cliente(ip, 5568); // Puerto 5568 del servidor
+					clienteLogic = new Cliente(ip, 5568);
 				}
 
 				String respuesta = "";
@@ -102,10 +98,9 @@ public class AppCliente {
 				if (respuesta != null
 						&& (respuesta.equals("LOGIN_CORRECTO") || respuesta.equals("REGISTRADO CORRECTAMENTE"))) {
 					JOptionPane.showMessageDialog(this, "Aceso concedido");
-					// Abrir menú principal
 					FrameMenu menu = new FrameMenu();
 					menu.setVisible(true);
-					this.dispose(); // Cerrar login
+					this.dispose();
 				} else {
 					JOptionPane.showMessageDialog(this, "Error: " + respuesta);
 				}
@@ -117,7 +112,6 @@ public class AppCliente {
 		}
 	}
 
-	// --- PANTALLA MENÚ / LISTA DE USUARIOS ---
 	public class FrameMenu extends JFrame {
 		private DefaultListModel<String> listModel;
 		private JList<String> listUsuarios;
@@ -150,7 +144,6 @@ public class AppCliente {
 			JButton btnLogout = new JButton("Cerrar Sesión");
 			panelBotones.add(btnLogout);
 
-			// Cargar lista inicial
 			cargarLista();
 
 			btnRefrescar.addActionListener(e -> cargarLista());
@@ -169,7 +162,6 @@ public class AppCliente {
 				} else if (seleccionado.equals("<" + clienteLogic.getNombre() + ">")) {
 					JOptionPane.showMessageDialog(this, "No puedes hablar contigo mismo (triste, lo sé)");
 				} else {
-					// Limpiar caracteres <>
 					String target = seleccionado.replace("<", "").replace(">", "");
 					abrirChat(target);
 				}
@@ -179,7 +171,6 @@ public class AppCliente {
 		private void cargarLista() {
 			listModel.clear();
 			String rawList = clienteLogic.obtenerListaUsuarios();
-			// rawList viene como "<pepe> <juan>"
 			String[] usuarios = rawList.split(" ");
 			for (String u : usuarios) {
 				if (!u.trim().isEmpty()) {
@@ -196,7 +187,6 @@ public class AppCliente {
 				String ip = datos[1];
 				int puerto = Integer.parseInt(datos[2]);
 
-				// Abrir ventana de chat
 				FrameChat chat = new FrameChat(usuarioDestino, ip, puerto);
 				chat.setVisible(true);
 			} else {
@@ -243,10 +233,8 @@ public class AppCliente {
 			JButton btnEnviar = new JButton("Enviar");
 			panelInput.add(btnEnviar, BorderLayout.EAST);
 
-			// IMPORTANTE: Conectar el hilo UDP con esta ventana para recibir mensajes
 			clienteLogic.getHiloUDP().setAreaChat(textArea);
 
-			// Iniciar Handshake en segundo plano para no congelar la GUI
 			new Thread(() -> {
 				textArea.append(">> Estableciendo conexión segura...\n");
 				clienteLogic.establecerClavesChat(ipDestino, puertoDestino);
@@ -262,11 +250,10 @@ public class AppCliente {
 			};
 
 			btnEnviar.addActionListener(enviarAction);
-			txtMensaje.addActionListener(enviarAction); // Enviar al pulsar Enter
+			txtMensaje.addActionListener(enviarAction);
 		}
 	}
 
-	// Main para arrancar la aplicación
 	public static void main(String[] args) {
 		EventQueue.invokeLater(() -> {
 			try {
